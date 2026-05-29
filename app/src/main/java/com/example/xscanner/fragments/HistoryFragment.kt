@@ -13,16 +13,18 @@ class HistoryFragment : Fragment() {
     private var _binding: FragmentHistoryBinding? = null
     private val binding get() = _binding!!
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentHistoryBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // For now, show an empty list
         binding.historyRecycler.layoutManager = LinearLayoutManager(requireContext())
-        binding.historyRecycler.adapter = HistoryAdapter(emptyList()) // you'll implement HistoryAdapter similarly
+        binding.historyRecycler.adapter = HistoryAdapter(emptyList())
     }
 
     override fun onDestroyView() {

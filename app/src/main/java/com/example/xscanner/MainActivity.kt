@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.example.xscanner.databinding.ActivityMainBinding
 import com.example.xscanner.fragments.*
+import com.example.xscanner.scanning.ScanType
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding

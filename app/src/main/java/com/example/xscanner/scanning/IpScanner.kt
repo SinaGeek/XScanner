@@ -1,90 +1,148 @@
-package com.example.xscanner.fragments
+package com.example.xscanner.scanning
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.Toast
-import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.xscanner.R
-import com.example.xscanner.adapters.ResultAdapter
-import com.example.xscanner.databinding.FragmentScanBinding
-import com.example.xscanner.scanning.IpScanner
-import com.example.xscanner.scanning.ResultItem
-import com.example.xscanner.scanning.ScanConfig
-import com.example.xscanner.scanning.ScanType
 import kotlinx.coroutines.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.concurrent.TimeUnit
 
-class ScanFragment : Fragment() {
-    private var _binding: FragmentScanBinding? = null
-    private val binding get() = _binding!!
-    private lateinit var scanner: IpScanner
-    private val results = mutableListOf<ResultItem>()
-    private lateinit var adapter: ResultAdapter
-    private var scanJob: Job? = null
-    private lateinit var scanType: ScanType
+class IpScanner(private val scanType: ScanType, private val context: Context) {
 
-    companion object {
-        fun newInstance(type: ScanType) = ScanFragment().apply {
-            arguments = Bundle().apply { putSerializable("type", type) }
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private fun loadRanges(): List<String> {
+        val resId = if (scanType == ScanType.IPV4) R.raw.ipv4 else R.raw.ipv6
+        return context.resources.openRawResource(resId).bufferedReader().readLines()
+            .filter { it.isNotBlank() }
+    }
+
+    suspend fun scan(
+        config: ScanConfig,
+        onProgress: suspend (tested: Int, total: Int) -> Unit,
+        onResult: suspend (ResultItem) -> Unit
+    ) = withContext(Dispatchers.IO) {
+        val ranges = loadRanges()
+        val allIps = ranges.toList()
+        val total = allIps.size
+        var tested = 0
+
+        for (ipStr in allIps) {
+            tested++
+            if (tested % 10 == 0) {
+                withContext(Dispatchers.Main) { onProgress(tested, total) }
+            }
+
+            // 1. TCP ping
+            val pingMs = tcpPing(ipStr, 443, config.maxPing)
+            if (pingMs < 0 || pingMs > config.maxPing) continue
+
+            // 2. Latency & jitter
+            val (latency, jitter) = measureLatencyJitter(ipStr, config.maxLatency)
+            if (jitter > config.maxJitter || latency > config.maxLatency) continue
+
+            // 3. Upload speed (must pass first to avoid unnecessary download test)
+            val upload = testUploadSpeed(ipStr, config.testSizeKB, config.minUploadSpeedMbps)
+            if (upload < config.minUploadSpeedMbps) continue
+
+            // 4. Download speed
+            val download = testDownloadSpeed(ipStr, config.testSizeKB, config.minDownloadSpeedMbps)
+            if (download < config.minDownloadSpeedMbps) continue
+
+            val item = ResultItem(ipStr, pingMs, 0.0, jitter, latency, upload, download)
+            withContext(Dispatchers.Main) { onResult(item) }
+        }
+        withContext(Dispatchers.Main) { onProgress(tested, total) }
+    }
+
+    private fun tcpPing(ip: String, port: Int, timeoutMs: Int): Long {
+        return try {
+            val start = System.nanoTime()
+            val socket = Socket()
+            socket.connect(InetSocketAddress(ip, port), timeoutMs)
+            val rtt = (System.nanoTime() - start) / 1_000_000
+            socket.close()
+            if (rtt > Int.MAX_VALUE) -1 else rtt
+        } catch (e: Exception) {
+            -1
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        scanType = arguments?.getSerializable("type") as ScanType
-    }
-
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        _binding = FragmentScanBinding.inflate(inflater, container, false)
-        return binding.root
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-        adapter = ResultAdapter(results) { selectedIps ->
-            val text = selectedIps.joinToString("\n")
-            val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("IPs", text))
-            Toast.makeText(requireContext(), "Copied ${selectedIps.size} IPs", Toast.LENGTH_SHORT).show()
+    private suspend fun measureLatencyJitter(ip: String, maxLatencyMs: Int): Pair<Long, Long> =
+        withContext(Dispatchers.IO) {
+            val url = "https://$ip/__down?bytes=1000"
+            val request = Request.Builder()
+                .url(url)
+                .header("Host", "speed.cloudflare.com")
+                .build()
+            val latencies = mutableListOf<Long>()
+            for (i in 1..4) {
+                try {
+                    val start = System.nanoTime()
+                    val response = client.newCall(request).execute()
+                    response.body?.bytes()
+                    val elapsed = (System.nanoTime() - start) / 1_000_000
+                    if (elapsed <= maxLatencyMs) latencies.add(elapsed)
+                } catch (_: Exception) {}
+            }
+            if (latencies.isEmpty()) return@withContext Pair(99999L, -1L)
+            val avgLatency = latencies.average().toLong()
+            val jitter = if (latencies.size > 1) {
+                latencies.zipWithNext { a, b -> kotlin.math.abs(a - b) }.average().toLong()
+            } else 0L
+            Pair(avgLatency, jitter)
         }
-        binding.tableRecycler.layoutManager = LinearLayoutManager(requireContext())
-        binding.tableRecycler.adapter = adapter
-        binding.btnCopy.visibility = View.GONE
 
-        scanner = IpScanner(scanType, requireContext())
-
-        scanJob = lifecycleScope.launch {
-            val config = ScanConfig() // use defaults for now
-            (activity as? com.example.xscanner.MainActivity)?.updateStatus("Scanning...")
-            scanner.scan(
-                config,
-                onProgress = { tested, total ->
-                    (activity as? com.example.xscanner.MainActivity)?.updateStatus("$tested/$total scanned")
-                },
-                onResult = { item ->
-                    results.add(item)
-                    adapter.notifyItemInserted(results.size - 1)
-                    if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
-                    (activity as? com.example.xscanner.MainActivity)?.updateStatus("Found ${results.size} valid IPs")
-                }
-            )
-            (activity as? com.example.xscanner.MainActivity)?.updateStatus("Done - ${results.size} IPs")
+    private suspend fun testDownloadSpeed(ip: String, sizeKB: Int, minSpeedMbps: Double): Double =
+        withContext(Dispatchers.IO) {
+            val bytes = sizeKB * 1024
+            val url = "https://$ip/__down?bytes=$bytes"
+            val request = Request.Builder()
+                .url(url)
+                .header("Host", "speed.cloudflare.com")
+                .build()
+            try {
+                val start = System.nanoTime()
+                val response = client.newCall(request).execute()
+                response.body?.bytes()
+                val elapsed = (System.nanoTime() - start) / 1_000_000_000.0
+                (bytes * 8 / 1_000_000.0) / elapsed
+            } catch (e: Exception) {
+                0.0
+            }
         }
-    }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        scanJob?.cancel()
-        _binding = null
-    }
+    private suspend fun testUploadSpeed(ip: String, sizeKB: Int, minSpeedMbps: Double): Double =
+        withContext(Dispatchers.IO) {
+            val uploadBytes = sizeKB * 1024  // total upload size in bytes
+            // Create a random payload (exact size)
+            val payload = ByteArray(uploadBytes) { 'A'.code.toByte() }
+            val mediaType = "application/octet-stream".toMediaType()
+            val body = payload.toRequestBody(mediaType)
+
+            val url = "https://$ip/__up"
+            val request = Request.Builder()
+                .url(url)
+                .header("Host", "speed.cloudflare.com")
+                .post(body)
+                .build()
+
+            try {
+                val start = System.nanoTime()
+                val response = client.newCall(request).execute()
+                response.body?.bytes() // consume response
+                val elapsed = (System.nanoTime() - start) / 1_000_000_000.0
+                if (elapsed > 0) (uploadBytes * 8 / 1_000_000.0) / elapsed else 0.0
+            } catch (e: Exception) {
+                0.0
+            }
+        }
 }

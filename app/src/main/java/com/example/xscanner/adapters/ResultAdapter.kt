@@ -3,7 +3,6 @@ package com.example.xscanner.adapters
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.example.xscanner.R
 import com.example.xscanner.databinding.ItemResultRowBinding
 import com.example.xscanner.scanning.ResultItem
 
@@ -34,7 +33,6 @@ class ResultAdapter(
             if (isChecked) selectedPositions.add(position) else selectedPositions.remove(position)
         }
         holder.binding.root.setOnLongClickListener {
-            // Trigger copy of all selected
             onCopy(getSelectedItems())
             true
         }
