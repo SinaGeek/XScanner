@@ -21,7 +21,6 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    // Load CIDR ranges from raw resource, parse them into pairs (base address, prefix length)
     private fun loadCidrRanges(): List<Pair<ByteArray, Int>> {
         val resId = if (scanType == ScanType.IPV4) R.raw.ipv4 else R.raw.ipv6
         return context.resources.openRawResource(resId).bufferedReader().readLines()
@@ -40,46 +39,44 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
             }
     }
 
-    // Calculate total possible hosts from a list of CIDR ranges (approximate, for progress)
     private fun totalHosts(ranges: List<Pair<ByteArray, Int>>): Long {
         var total = 0L
         for ((_, prefix) in ranges) {
-            val hosts = if (scanType == ScanType.IPV4) {
-                if (prefix >= 32) 0L else (1L shl (32 - prefix)) - 2  // exclude network & broadcast
+            if (scanType == ScanType.IPV4) {
+                if (prefix >= 32) continue
+                val hosts = (1L shl (32 - prefix)) - 2L
+                total += hosts
             } else {
-                // IPv6: extremely large, just return a huge number to avoid overflow
-                Long.MAX_VALUE
+                // IPv6 – show a huge number for progress
+                return Long.MAX_VALUE
             }
-            total += hosts
-            if (total < 0) return Long.MAX_VALUE // overflow guard
         }
-        return total
+        return total.coerceAtMost(Long.MAX_VALUE)
     }
 
-    // Random IP generator that yields random IPs from the CIDR ranges
     private fun randomIpGenerator(ranges: List<Pair<ByteArray, Int>>): suspend () -> String? {
+        if (ranges.isEmpty()) return { null }
         val rng = Random(System.nanoTime())
         return {
-            if (ranges.isEmpty()) null
             val (base, prefix) = ranges.random(rng)
             if (scanType == ScanType.IPV4) {
                 val baseInt = ((base[0].toInt() and 0xFF) shl 24) or
                         ((base[1].toInt() and 0xFF) shl 16) or
                         ((base[2].toInt() and 0xFF) shl 8) or
                         (base[3].toInt() and 0xFF)
-                val mask = if (prefix == 0) 0 else (0xFFFFFFFF.toInt() ushr (32 - prefix))
-                val network = baseInt and mask
-                val hosts = if (prefix >= 32) 0 else (1 shl (32 - prefix)) - 2
-                if (hosts <= 0) null
-                val offset = rng.nextInt(1, hosts + 1)
-                val ipInt = network + offset
-                val octet1 = (ipInt ushr 24) and 0xFF
-                val octet2 = (ipInt ushr 16) and 0xFF
-                val octet3 = (ipInt ushr 8) and 0xFF
-                val octet4 = ipInt and 0xFF
-                "$octet1.$octet2.$octet3.$octet4"
+                // Correct network mask
+                val networkMask = (-1) shl (32 - prefix)
+                val network = baseInt and networkMask
+                val hosts = if (prefix >= 32) 0L else (1L shl (32 - prefix)) - 2L
+                if (hosts <= 0) return@let null
+                val offset = rng.nextLong(1, hosts + 1)
+                val ipInt = network + offset.toInt()
+                val oct1 = (ipInt ushr 24) and 0xFF
+                val oct2 = (ipInt ushr 16) and 0xFF
+                val oct3 = (ipInt ushr 8) and 0xFF
+                val oct4 = ipInt and 0xFF
+                "$oct1.$oct2.$oct3.$oct4"
             } else {
-                // IPv6: skip for now (rarely used for CF scanning)
                 null
             }
         }
@@ -94,8 +91,11 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
         val total = totalHosts(ranges)
         var scanned = 0
         var validFound = 0
-        val testedIps = mutableSetOf<String>()  // to avoid duplicates
+        val testedIps = mutableSetOf<String>()
         val gen = randomIpGenerator(ranges)
+
+        // Immediately show the total
+        withContext(Dispatchers.Main) { onProgress(0, total, 0) }
 
         while (validFound < config.maxIp) {
             val ip = withContext(Dispatchers.Default) { gen() } ?: break
@@ -105,33 +105,43 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
 
             // TCP ping
             val pingMs = tcpPing(ip, 443, config.maxPing)
-            if (pingMs < 0 || pingMs > config.maxPing) continue
+            if (pingMs < 0 || pingMs > config.maxPing) {
+                if (scanned % 10 == 0) withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
+                continue
+            }
 
             // Latency & jitter
             val (latency, jitter) = measureLatencyJitter(ip, config.maxLatency)
-            if (jitter > config.maxJitter || latency > config.maxLatency) continue
+            if (jitter > config.maxJitter || latency > config.maxLatency) {
+                if (scanned % 10 == 0) withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
+                continue
+            }
 
             // Upload speed (must pass first)
             val upload = testUploadSpeed(ip, config.testSizeKB, config.minUploadSpeedMbps)
-            if (upload < config.minUploadSpeedMbps) continue
+            if (upload < config.minUploadSpeedMbps) {
+                if (scanned % 10 == 0) withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
+                continue
+            }
 
             // Download speed
             val download = testDownloadSpeed(ip, config.testSizeKB, config.minDownloadSpeedMbps)
-            if (download < config.minDownloadSpeedMbps) continue
+            if (download < config.minDownloadSpeedMbps) {
+                if (scanned % 10 == 0) withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
+                continue
+            }
 
             val item = ResultItem(ip, pingMs, 0.0, jitter, latency, upload, download)
             withContext(Dispatchers.Main) { onResult(item) }
             validFound++
 
-            // Report progress every 10 scans or when valid found
-            if (scanned % 10 == 0 || validFound % 5 == 0) {
-                withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
-            }
+            // Update progress after each valid IP
+            withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
         }
         withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
     }
 
-    // ... (tcpPing, measureLatencyJitter, testDownloadSpeed, testUploadSpeed remain the same as before)
+    // (tcpPing, measureLatencyJitter, testDownloadSpeed, testUploadSpeed remain unchanged)
     private fun tcpPing(ip: String, port: Int, timeoutMs: Int): Long {
         return try {
             val start = System.nanoTime()

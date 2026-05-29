@@ -60,13 +60,17 @@ class ScanFragment : Fragment() {
         val config = (activity as MainActivity).scanConfig
         scanner = IpScanner(scanType, requireContext())
 
-        // Button listeners (no auto-start)
+        // Initial UI state
+        (activity as MainActivity).updateStatus("Press Start to scan")
+        (activity as MainActivity).updateSettingsSummary(config)
+
+        // Button listeners
         binding.btnStart.setOnClickListener { startScan(config) }
         binding.btnPause.setOnClickListener { pauseScan() }
         binding.btnStop.setOnClickListener { stopScan() }
         binding.btnContinue.setOnClickListener { resumeScan(config) }
 
-        // Initial button states: Start enabled, others disabled
+        // Start disabled, others disabled
         enableButtons(started = false, paused = false)
     }
 
@@ -122,7 +126,6 @@ class ScanFragment : Fragment() {
     private fun resumeScan(config: ScanConfig) {
         if (!isPaused) return
         isPaused = false
-        // Resume from scratch (for now)
         startScan(config)
     }
 
