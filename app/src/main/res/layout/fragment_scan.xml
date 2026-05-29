@@ -1,64 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Scan control buttons -->
 <LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/controlPanel"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingBottom="8dp">
 
-    <!-- Scan control buttons -->
-    <LinearLayout
-        android:id="@+id/controlPanel"
-        android:layout_width="match_parent"
+    <Button
+        android:id="@+id/btnStart"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingBottom="8dp">
+        android:layout_weight="1"
+        android:text="Start"
+        android:textSize="16sp"
+        android:minHeight="48dp"
+        android:backgroundTint="@color/design_default_color_primary"
+        android:textColor="@android:color/white"
+        android:layout_margin="2dp" />
 
-        <Button
-            android:id="@+id/btnStart"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Start" />
+    <Button
+        android:id="@+id/btnPause"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Pause"
+        android:textSize="16sp"
+        android:minHeight="48dp"
+        android:enabled="false"
+        android:backgroundTint="@android:color/darker_gray"
+        android:textColor="@android:color/white"
+        android:layout_margin="2dp" />
 
-        <Button
-            android:id="@+id/btnPause"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="Pause" />
+    <Button
+        android:id="@+id/btnStop"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Stop"
+        android:textSize="16sp"
+        android:minHeight="48dp"
+        android:enabled="false"
+        android:backgroundTint="@android:color/holo_red_dark"
+        android:textColor="@android:color/white"
+        android:layout_margin="2dp" />
 
-        <Button
-            android:id="@+id/btnStop"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="Stop" />
+    <Button
+        android:id="@+id/btnContinue"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Continue"
+        android:textSize="16sp"
+        android:minHeight="48dp"
+        android:enabled="false"
+        android:backgroundTint="@color/design_default_color_primary"
+        android:textColor="@android:color/white"
+        android:layout_margin="2dp" />
+</LinearLayout>
 
-        <Button
-            android:id="@+id/btnContinue"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:enabled="false"
-            android:text="Continue" />
-    </LinearLayout>
-
-    <!-- Result table -->
+<!-- Result table -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/tableRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <!-- Copy button -->
+<!-- Copy button -->
     <Button
         android:id="@+id/btnCopy"
         style="@style/Widget.MaterialComponents.Button"

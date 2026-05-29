@@ -9,5 +9,12 @@
     <EditText android:id="@+id/etApiKey" android:hint="API Key" />
     <EditText android:id="@+id/etZoneId" android:hint="Zone ID" />
     <EditText android:id="@+id/etSubdomain" android:hint="Subdomain (e.g. ip.example.com)" />
-    <Button android:id="@+id/btnValidate" android:text="Validate" />
+
+    <Button
+        android:id="@+id/btnSaveCloudflare"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp"
+        android:text="Save Cloudflare Settings" />
 </LinearLayout>
