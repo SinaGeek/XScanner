@@ -23,11 +23,12 @@ class ResultAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         holder.binding.tvIp.text = item.ip
-        holder.binding.tvPing.text = "${item.ping}ms"
-        holder.binding.tvJitter.text = "${item.jitter}ms"
-        holder.binding.tvLatency.text = "${item.latency}ms"
-        holder.binding.tvUpload.text = "%.2f".format(item.uploadMbps)
-        holder.binding.tvDownload.text = "%.2f".format(item.downloadMbps)
+        holder.binding.tvPing.text = "Ping: ${item.ping}ms"
+        holder.binding.tvJitter.text = "Jitter: ${item.jitter}ms"
+        holder.binding.tvLatency.text = "Latency: ${item.latency}ms"
+        holder.binding.tvUpload.text = "Up: %.2f".format(item.uploadMbps)
+        holder.binding.tvDownload.text = "Down: %.2f".format(item.downloadMbps)
+
         holder.binding.checkBox.isChecked = selectedPositions.contains(position)
         holder.binding.checkBox.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) selectedPositions.add(position) else selectedPositions.remove(position)

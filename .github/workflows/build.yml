@@ -4,17 +4,17 @@ on:
   push:
     branches: [main]
     tags:
-      - 'v*'         # Triggers release only on version tags
-  workflow_dispatch:   # Allows manual trigger with version input
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # optional, to avoid Node warnings
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     permissions:
-      contents: write   # Required for creating a release
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +25,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # Cache Gradle dependencies
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -33,8 +41,9 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --licenses
 
+      # Use Gradle daemon and parallel builds
       - name: Build debug APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --parallel --build-cache --daemon
 
       - name: Rename APK
         run: mv app/build/outputs/apk/debug/app-debug.apk XScanner.apk
@@ -45,7 +54,7 @@ jobs:
           name: XScanner
           path: XScanner.apk
 
-      - name: Create GitHub Release (only on tag or manual)
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:

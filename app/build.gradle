@@ -23,6 +23,14 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    buildFeatures {
+        viewBinding true
+        buildConfig false     // Disable if you don't use BuildConfig
+    }
+    // Only build debug for now
+    buildTypes {
+        release {
+            minifyEnabled false
 }
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
