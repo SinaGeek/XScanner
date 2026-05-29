@@ -87,18 +87,16 @@ class ScanFragment : Fragment() {
         scanJob = lifecycleScope.launch {
             scanner.scan(
                 config,
-                onProgress = { scanned, total, valid ->
+                onProgress = { scanned, total, valid, currentIP ->
                     withContext(Dispatchers.Main) {
-                        (activity as MainActivity).updateStatus("$scanned / $total scanned – $valid valid IPs")
+                        val status = if (scanned == -1) "Network unavailable"
+                        else {
+                            val ipInfo = if (currentIP != null) " ($currentIP)" else ""
+                        "$scanned / $total scanned – $valid valid IPs$ipInfo"
                     }
-                },
-                onResult = { item ->
-                    withContext(Dispatchers.Main) {
-                        results.add(item)
-                        adapter.notifyItemInserted(results.size - 1)
-                        if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
-                    }
-                }
+                    (activity as MainActivity).updateStatus(status)
+    }
+}
             )
             withContext(Dispatchers.Main) {
                 enableButtons(started = false, paused = false)

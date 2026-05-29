@@ -1,7 +1,5 @@
-package com.example.xscanner.scanning
-
 data class ScanConfig(
-    val maxIp: Int = 50,
+    val maxIp: Int = 10,
     val maxPing: Int = 500,
     val maxJitter: Int = 100,
     val maxLatency: Int = 1000,
