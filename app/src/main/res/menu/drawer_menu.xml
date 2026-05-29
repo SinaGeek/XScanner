@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_ipv4" android:title="IPv4 Scan" />
+    <item android:id="@+id/nav_ipv6" android:title="IPv6 Scan" />
+    <item android:id="@+id/nav_defaults" android:title="Default Values" />
+    <item android:id="@+id/nav_cloudflare" android:title="Cloudflare API" />
+    <item android:id="@+id/nav_history" android:title="Previous Scan Results" />
+    <item android:id="@+id/nav_about" android:title="About Me" />
+    <item android:id="@+id/nav_exit" android:title="Exit" />
+</menu>

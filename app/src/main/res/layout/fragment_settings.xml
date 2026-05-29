@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText android:id="@+id/etMaxIp" android:hint="Max IPs" android:inputType="number" />
+    <EditText android:id="@+id/etMaxPing" android:hint="Max Ping (ms)" android:inputType="number" />
+    <EditText android:id="@+id/etMaxJitter" android:hint="Max Jitter (ms)"
+        android:inputType="number" />
+    <EditText android:id="@+id/etMaxLatency" android:hint="Max Latency (ms)"
+        android:inputType="number" />
+    <EditText android:id="@+id/etMaxPacketLoss" android:hint="Max Packet Loss (0-1)"
+        android:inputType="numberDecimal" />
+    <EditText android:id="@+id/etTestSize" android:hint="Test Size (KB)" android:inputType="number" />
+    <EditText android:id="@+id/etMinDl" android:hint="Min Download (Mbps)"
+        android:inputType="numberDecimal" />
+    <EditText android:id="@+id/etMinUl" android:hint="Min Upload (Mbps)"
+        android:inputType="numberDecimal" />
+</LinearLayout>

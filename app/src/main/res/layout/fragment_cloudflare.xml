@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText android:id="@+id/etEmail" android:hint="Cloudflare Email" />
+    <EditText android:id="@+id/etApiKey" android:hint="API Key" />
+    <EditText android:id="@+id/etZoneId" android:hint="Zone ID" />
+    <EditText android:id="@+id/etSubdomain" android:hint="Subdomain (e.g. ip.example.com)" />
+    <Button android:id="@+id/btnValidate" android:text="Validate" />
+</LinearLayout>
