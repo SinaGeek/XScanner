@@ -4,10 +4,9 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.xscanner.databinding.ItemResultRowBinding
-import com.example.xscanner.scanning.ResultItem
 
 class ResultAdapter(
-    private val items: List<ResultItem>,
+    private val items: List<Map<String, String>>,
     private val onCopy: (List<String>) -> Unit
 ) : RecyclerView.Adapter<ResultAdapter.ViewHolder>() {
 
@@ -22,12 +21,12 @@ class ResultAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        holder.binding.tvIp.text = item.ip
-        holder.binding.tvPing.text = "Ping: ${item.ping}ms"
-        holder.binding.tvJitter.text = "Jitter: ${item.jitter}ms"
-        holder.binding.tvLatency.text = "Latency: ${item.latency}ms"
-        holder.binding.tvUpload.text = "Up: %.2f".format(item.uploadMbps)
-        holder.binding.tvDownload.text = "Down: %.2f".format(item.downloadMbps)
+        holder.binding.tvIp.text = item["ip"] ?: ""
+        holder.binding.tvPing.text = item["ping"] ?: ""
+        holder.binding.tvJitter.text = item["jitter"] ?: ""
+        holder.binding.tvLatency.text = item["latency"] ?: ""
+        holder.binding.tvUpload.text = item["upload"] ?: ""
+        holder.binding.tvDownload.text = item["download"] ?: ""
 
         holder.binding.checkBox.isChecked = selectedPositions.contains(position)
         holder.binding.checkBox.setOnCheckedChangeListener { _, isChecked ->
@@ -43,7 +42,7 @@ class ResultAdapter(
 
     fun getSelectedItems(): List<String> {
         return selectedPositions.mapNotNull { pos ->
-            if (pos < items.size) items[pos].ip else null
+            if (pos < items.size) items[pos]["ip"] else null
         }
     }
 }

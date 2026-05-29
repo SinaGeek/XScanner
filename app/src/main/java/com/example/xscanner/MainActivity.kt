@@ -7,17 +7,23 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.example.xscanner.databinding.ActivityMainBinding
 import com.example.xscanner.fragments.*
-import com.example.xscanner.scanning.ScanConfig
-import com.example.xscanner.scanning.ScanType
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var drawerToggle: ActionBarDrawerToggle
 
-    var scanConfig = ScanConfig()
+    var scanConfig = mutableMapOf(
+        "max_ip" to "10",
+        "max_ping" to "500",
+        "max_jitter" to "100",
+        "max_latency" to "1000",
+        "max_packet_loss" to "0.5",
+        "test_size" to "1024",
+        "min_download_speed" to "3.0",
+        "min_upload_speed" to "0.2"
+    )
 
-    // Fragment references to keep them alive
     private lateinit var ipv4Fragment: ScanFragment
     private lateinit var ipv6Fragment: ScanFragment
     private lateinit var settingsFragment: SettingsFragment
@@ -40,15 +46,13 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.addDrawerListener(drawerToggle)
         drawerToggle.syncState()
 
-        // Create all fragments once
-        ipv4Fragment = ScanFragment.newInstance(ScanType.IPV4)
-        ipv6Fragment = ScanFragment.newInstance(ScanType.IPV6)
+        ipv4Fragment = ScanFragment()
+        ipv6Fragment = ScanFragment()
         settingsFragment = SettingsFragment()
         cloudflareFragment = CloudflareFragment()
         historyFragment = HistoryFragment()
         aboutFragment = AboutFragment()
 
-        // Add all, hide all except first
         supportFragmentManager.beginTransaction()
             .add(R.id.fragment_container, ipv4Fragment, "IPv4")
             .add(R.id.fragment_container, ipv6Fragment, "IPv6")
@@ -97,9 +101,9 @@ class MainActivity : AppCompatActivity() {
         binding.tvScanStatus.text = status
     }
 
-    fun updateSettingsSummary(config: ScanConfig) {
+    fun updateSettingsSummary(config: Map<String, String>) {
         binding.tvSettingsSummary.text =
-            "Max Ping: ${config.maxPing}ms | Jitter: ${config.maxJitter}ms | Latency: ${config.maxLatency}ms"
+            "Max Ping: ${config["max_ping"]}ms | Jitter: ${config["max_jitter"]}ms | Latency: ${config["max_latency"]}ms"
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

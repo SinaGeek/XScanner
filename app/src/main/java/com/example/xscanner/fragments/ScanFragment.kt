@@ -14,27 +14,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.xscanner.MainActivity
 import com.example.xscanner.adapters.ResultAdapter
 import com.example.xscanner.databinding.FragmentScanBinding
-import com.example.xscanner.scanning.*
+import com.example.xscanner.scanning.PyIpScanner
 import kotlinx.coroutines.*
 
 class ScanFragment : Fragment() {
 
     private var _binding: FragmentScanBinding? = null
     private val binding get() = _binding!!
-    private lateinit var scanner: IpScanner
-    private val results = mutableListOf<ResultItem>()
+    private lateinit var scanner: PyIpScanner
+    private val results = mutableListOf<Map<String, String>>()
     private lateinit var adapter: ResultAdapter
     private var scanJob: Job? = null
     private var isPaused = false
-    private val scanType: ScanType by lazy {
-        arguments?.getSerializable("type") as ScanType
-    }
-
-    companion object {
-        fun newInstance(type: ScanType) = ScanFragment().apply {
-            arguments = Bundle().apply { putSerializable("type", type) }
-        }
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -58,28 +49,25 @@ class ScanFragment : Fragment() {
         binding.btnCopy.visibility = View.GONE
 
         val config = (activity as MainActivity).scanConfig
-        scanner = IpScanner(scanType, requireContext())
+        scanner = PyIpScanner(requireContext())
 
-        // Initial UI state
         (activity as MainActivity).updateStatus("Press Start to scan")
         (activity as MainActivity).updateSettingsSummary(config)
 
-        // Button listeners
         binding.btnStart.setOnClickListener { startScan(config) }
         binding.btnPause.setOnClickListener { pauseScan() }
         binding.btnStop.setOnClickListener { stopScan() }
         binding.btnContinue.setOnClickListener { resumeScan(config) }
 
-        // Start disabled, others disabled
-        enableButtons(started = false, paused = false)
+        enableButtons(false, false)
     }
 
-    private fun startScan(config: ScanConfig) {
+    private fun startScan(config: Map<String, String>) {
         scanJob?.cancel()
         results.clear()
         adapter.notifyDataSetChanged()
         binding.btnCopy.visibility = View.GONE
-        enableButtons(started = true, paused = false)
+        enableButtons(true, false)
 
         (activity as MainActivity).updateStatus("Scanning...")
         (activity as MainActivity).updateSettingsSummary(config)
@@ -87,19 +75,27 @@ class ScanFragment : Fragment() {
         scanJob = lifecycleScope.launch {
             scanner.scan(
                 config,
-                onProgress = { scanned, total, valid, currentIP ->
-                    withContext(Dispatchers.Main) {
-                        val status = if (scanned == -1) "Network unavailable"
-                        else {
+                object : PyIpScanner.ProgressCallback {
+                    override fun onProgress(scanned: Int, total: Long, valid: Int, currentIP: String?) {
+                        lifecycleScope.launch(Dispatchers.Main) {
                             val ipInfo = if (currentIP != null) " ($currentIP)" else ""
-                        "$scanned / $total scanned – $valid valid IPs$ipInfo"
+                            (activity as MainActivity).updateStatus("$scanned / $total scanned – $valid valid IPs$ipInfo")
+                        }
                     }
-                    (activity as MainActivity).updateStatus(status)
-    }
-}
+                },
+                object : PyIpScanner.ResultCallback {
+                    override fun onResult(item: Map<String, Any>) {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            val map = item.mapValues { it.value.toString() }
+                            results.add(map)
+                            adapter.notifyItemInserted(results.size - 1)
+                            if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
+                        }
+                    }
+                }
             )
             withContext(Dispatchers.Main) {
-                enableButtons(started = false, paused = false)
+                enableButtons(false, false)
                 (activity as MainActivity).updateStatus("Done – ${results.size} IPs")
             }
         }
@@ -108,7 +104,7 @@ class ScanFragment : Fragment() {
     private fun pauseScan() {
         scanJob?.cancel()
         isPaused = true
-        enableButtons(started = true, paused = true)
+        enableButtons(true, true)
         (activity as MainActivity).updateStatus("Paused – ${results.size} IPs")
     }
 
@@ -117,11 +113,11 @@ class ScanFragment : Fragment() {
         results.clear()
         adapter.notifyDataSetChanged()
         binding.btnCopy.visibility = View.GONE
-        enableButtons(started = false, paused = false)
+        enableButtons(false, false)
         (activity as MainActivity).updateStatus("Stopped")
     }
 
-    private fun resumeScan(config: ScanConfig) {
+    private fun resumeScan(config: Map<String, String>) {
         if (!isPaused) return
         isPaused = false
         startScan(config)
