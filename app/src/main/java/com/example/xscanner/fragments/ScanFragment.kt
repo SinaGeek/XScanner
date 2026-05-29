@@ -60,14 +60,14 @@ class ScanFragment : Fragment() {
         val config = (activity as MainActivity).scanConfig
         scanner = IpScanner(scanType, requireContext())
 
-        // *** Button listeners (these were missing) ***
+        // Button listeners (no auto-start)
         binding.btnStart.setOnClickListener { startScan(config) }
         binding.btnPause.setOnClickListener { pauseScan() }
         binding.btnStop.setOnClickListener { stopScan() }
         binding.btnContinue.setOnClickListener { resumeScan(config) }
 
-        // Auto-start scanning
-        startScan(config)
+        // Initial button states: Start enabled, others disabled
+        enableButtons(started = false, paused = false)
     }
 
     private fun startScan(config: ScanConfig) {
@@ -83,9 +83,9 @@ class ScanFragment : Fragment() {
         scanJob = lifecycleScope.launch {
             scanner.scan(
                 config,
-                onProgress = { tested, total ->
+                onProgress = { scanned, total, valid ->
                     withContext(Dispatchers.Main) {
-                        (activity as MainActivity).updateStatus("$tested/$total scanned")
+                        (activity as MainActivity).updateStatus("$scanned / $total scanned – $valid valid IPs")
                     }
                 },
                 onResult = { item ->
@@ -93,7 +93,6 @@ class ScanFragment : Fragment() {
                         results.add(item)
                         adapter.notifyItemInserted(results.size - 1)
                         if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
-                        (activity as MainActivity).updateStatus("Found ${results.size} valid IPs")
                     }
                 }
             )
@@ -123,7 +122,7 @@ class ScanFragment : Fragment() {
     private fun resumeScan(config: ScanConfig) {
         if (!isPaused) return
         isPaused = false
-        // Resume scan from scratch (for now)
+        // Resume from scratch (for now)
         startScan(config)
     }
 
