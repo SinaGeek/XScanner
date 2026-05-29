@@ -17,6 +17,14 @@ class MainActivity : AppCompatActivity() {
 
     var scanConfig = ScanConfig()
 
+    // Fragment references to keep them alive
+    private lateinit var ipv4Fragment: ScanFragment
+    private lateinit var ipv6Fragment: ScanFragment
+    private lateinit var settingsFragment: SettingsFragment
+    private lateinit var cloudflareFragment: CloudflareFragment
+    private lateinit var historyFragment: HistoryFragment
+    private lateinit var aboutFragment: AboutFragment
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -32,29 +40,56 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.addDrawerListener(drawerToggle)
         drawerToggle.syncState()
 
+        // Create all fragments once
+        ipv4Fragment = ScanFragment.newInstance(ScanType.IPV4)
+        ipv6Fragment = ScanFragment.newInstance(ScanType.IPV6)
+        settingsFragment = SettingsFragment()
+        cloudflareFragment = CloudflareFragment()
+        historyFragment = HistoryFragment()
+        aboutFragment = AboutFragment()
+
+        // Add all, hide all except first
+        supportFragmentManager.beginTransaction()
+            .add(R.id.fragment_container, ipv4Fragment, "IPv4")
+            .add(R.id.fragment_container, ipv6Fragment, "IPv6")
+            .add(R.id.fragment_container, settingsFragment, "Settings")
+            .add(R.id.fragment_container, cloudflareFragment, "Cloudflare")
+            .add(R.id.fragment_container, historyFragment, "History")
+            .add(R.id.fragment_container, aboutFragment, "About")
+            .hide(ipv6Fragment)
+            .hide(settingsFragment)
+            .hide(cloudflareFragment)
+            .hide(historyFragment)
+            .hide(aboutFragment)
+            .commit()
+
+        supportActionBar?.title = "IPv4 Scan"
+
         binding.navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_ipv4 -> loadFragment(ScanFragment.newInstance(ScanType.IPV4), "IPv4 Scan")
-                R.id.nav_ipv6 -> loadFragment(ScanFragment.newInstance(ScanType.IPV6), "IPv6 Scan")
-                R.id.nav_defaults -> loadFragment(SettingsFragment(), "Default Values")
-                R.id.nav_cloudflare -> loadFragment(CloudflareFragment(), "Cloudflare API")
-                R.id.nav_history -> loadFragment(HistoryFragment(), "Previous Scans")
-                R.id.nav_about -> loadFragment(AboutFragment(), "About")
+                R.id.nav_ipv4 -> showFragment(ipv4Fragment, "IPv4 Scan")
+                R.id.nav_ipv6 -> showFragment(ipv6Fragment, "IPv6 Scan")
+                R.id.nav_defaults -> showFragment(settingsFragment, "Default Values")
+                R.id.nav_cloudflare -> showFragment(cloudflareFragment, "Cloudflare API")
+                R.id.nav_history -> showFragment(historyFragment, "Previous Scans")
+                R.id.nav_about -> showFragment(aboutFragment, "About")
                 R.id.nav_exit -> finish()
             }
             binding.drawerLayout.close()
             true
         }
-
-        if (savedInstanceState == null) {
-            loadFragment(ScanFragment.newInstance(ScanType.IPV4), "IPv4 Scan")
-        }
     }
 
-    fun loadFragment(fragment: Fragment, title: String) {
+    private fun showFragment(fragment: Fragment, title: String) {
         supportActionBar?.title = title
         supportFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
+            .hide(ipv4Fragment)
+            .hide(ipv6Fragment)
+            .hide(settingsFragment)
+            .hide(cloudflareFragment)
+            .hide(historyFragment)
+            .hide(aboutFragment)
+            .show(fragment)
             .commit()
     }
 
@@ -63,7 +98,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun updateSettingsSummary(config: ScanConfig) {
-        binding.tvSettingsSummary.text = "Max Ping: ${config.maxPing}ms | Jitter: ${config.maxJitter}ms | Latency: ${config.maxLatency}ms"
+        binding.tvSettingsSummary.text =
+            "Max Ping: ${config.maxPing}ms | Jitter: ${config.maxJitter}ms | Latency: ${config.maxLatency}ms"
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
