@@ -51,16 +51,14 @@
             android:text="Continue" />
     </LinearLayout>
 
-    <!-- Result table (RecyclerView with cards) -->
+    <!-- Result table -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/tableRecycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:clipToPadding="false"
-        android:padding="4dp" />
+        android:layout_weight="1" />
 
-    <!-- Copy button (only visible when IPs are selected) -->
+    <!-- Copy button -->
     <Button
         android:id="@+id/btnCopy"
         style="@style/Widget.MaterialComponents.Button"

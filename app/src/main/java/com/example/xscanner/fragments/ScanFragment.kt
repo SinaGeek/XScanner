@@ -14,19 +14,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.xscanner.MainActivity
 import com.example.xscanner.adapters.ResultAdapter
 import com.example.xscanner.databinding.FragmentScanBinding
-import com.example.xscanner.scanning.IpScanner
-import com.example.xscanner.scanning.ResultItem
-import com.example.xscanner.scanning.ScanConfig
-import com.example.xscanner.scanning.ScanType
-import kotlinx.coroutines.launch
+import com.example.xscanner.scanning.*
+import kotlinx.coroutines.*
 
 class ScanFragment : Fragment() {
+
     private var _binding: FragmentScanBinding? = null
     private val binding get() = _binding!!
     private lateinit var scanner: IpScanner
     private val results = mutableListOf<ResultItem>()
     private lateinit var adapter: ResultAdapter
-    private var scanJob: kotlinx.coroutines.Job? = null
+    private var scanJob: Job? = null
+    private var isPaused = false
     private val scanType: ScanType by lazy {
         arguments?.getSerializable("type") as ScanType
     }
@@ -58,25 +57,81 @@ class ScanFragment : Fragment() {
         binding.tableRecycler.adapter = adapter
         binding.btnCopy.visibility = View.GONE
 
+        val config = (activity as MainActivity).scanConfig
         scanner = IpScanner(scanType, requireContext())
 
+        // *** Button listeners (these were missing) ***
+        binding.btnStart.setOnClickListener { startScan(config) }
+        binding.btnPause.setOnClickListener { pauseScan() }
+        binding.btnStop.setOnClickListener { stopScan() }
+        binding.btnContinue.setOnClickListener { resumeScan(config) }
+
+        // Auto-start scanning
+        startScan(config)
+    }
+
+    private fun startScan(config: ScanConfig) {
+        scanJob?.cancel()
+        results.clear()
+        adapter.notifyDataSetChanged()
+        binding.btnCopy.visibility = View.GONE
+        enableButtons(started = true, paused = false)
+
+        (activity as MainActivity).updateStatus("Scanning...")
+        (activity as MainActivity).updateSettingsSummary(config)
+
         scanJob = lifecycleScope.launch {
-            val config = ScanConfig() // default config (can be replaced with saved settings)
-            (activity as? MainActivity)?.updateStatus("Scanning...")
             scanner.scan(
                 config,
                 onProgress = { tested, total ->
-                    (activity as? MainActivity)?.updateStatus("$tested/$total scanned")
+                    withContext(Dispatchers.Main) {
+                        (activity as MainActivity).updateStatus("$tested/$total scanned")
+                    }
                 },
                 onResult = { item ->
-                    results.add(item)
-                    adapter.notifyItemInserted(results.size - 1)
-                    if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
-                    (activity as? MainActivity)?.updateStatus("Found ${results.size} valid IPs")
+                    withContext(Dispatchers.Main) {
+                        results.add(item)
+                        adapter.notifyItemInserted(results.size - 1)
+                        if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
+                        (activity as MainActivity).updateStatus("Found ${results.size} valid IPs")
+                    }
                 }
             )
-            (activity as? MainActivity)?.updateStatus("Done – ${results.size} IPs")
+            withContext(Dispatchers.Main) {
+                enableButtons(started = false, paused = false)
+                (activity as MainActivity).updateStatus("Done – ${results.size} IPs")
+            }
         }
+    }
+
+    private fun pauseScan() {
+        scanJob?.cancel()
+        isPaused = true
+        enableButtons(started = true, paused = true)
+        (activity as MainActivity).updateStatus("Paused – ${results.size} IPs")
+    }
+
+    private fun stopScan() {
+        scanJob?.cancel()
+        results.clear()
+        adapter.notifyDataSetChanged()
+        binding.btnCopy.visibility = View.GONE
+        enableButtons(started = false, paused = false)
+        (activity as MainActivity).updateStatus("Stopped")
+    }
+
+    private fun resumeScan(config: ScanConfig) {
+        if (!isPaused) return
+        isPaused = false
+        // Resume scan from scratch (for now)
+        startScan(config)
+    }
+
+    private fun enableButtons(started: Boolean, paused: Boolean) {
+        binding.btnStart.isEnabled = !started
+        binding.btnPause.isEnabled = started && !paused
+        binding.btnStop.isEnabled = started
+        binding.btnContinue.isEnabled = started && paused
     }
 
     override fun onDestroyView() {
