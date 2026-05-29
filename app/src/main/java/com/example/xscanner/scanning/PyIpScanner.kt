@@ -1,6 +1,8 @@
+// File: app/src/main/java/com/example/xscanner/scanning/PyIpScanner.kt
 package com.example.xscanner.scanning
 
 import android.content.Context
+import com.chaquo.python.PyObject
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.Dispatchers
@@ -46,18 +48,15 @@ class PyIpScanner(private val context: Context) {
         val mutableConfig = config.toMutableMap()
         mutableConfig["ip_list_path"] = ipListPath
 
-        // Build Python dict from the mutable config
-        val pyConfig = py.builtins.dict()
-        for ((key, value) in mutableConfig) {
-            pyConfig[key] = value
-        }
+        // Pass config as a Java Map (Chaquopy automatically converts it to Python dict)
+        val pyConfig = PyObject.fromJava(mutableConfig)
 
         // Create Java proxies for callbacks
         val progressProxy = ProgressProxy().also { it.callback = onProgress }
         val resultProxy = ResultProxy().also { it.callback = onResult }
 
-        val pyProgress = com.chaquo.python.PyObject.fromJava(progressProxy)
-        val pyResult = com.chaquo.python.PyObject.fromJava(resultProxy)
+        val pyProgress = PyObject.fromJava(progressProxy)
+        val pyResult = PyObject.fromJava(resultProxy)
 
         // Run the Python function
         module.callAttr("run_scan", pyConfig, pyProgress, pyResult)

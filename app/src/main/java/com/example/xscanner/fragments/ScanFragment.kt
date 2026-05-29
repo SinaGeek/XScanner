@@ -1,3 +1,4 @@
+// File: app/src/main/java/com/example/xscanner/fragments/ScanFragment.kt
 package com.example.xscanner.fragments
 
 import android.content.ClipData
@@ -75,22 +76,17 @@ class ScanFragment : Fragment() {
         scanJob = lifecycleScope.launch {
             scanner.scan(
                 config,
-                object : PyIpScanner.ProgressCallback {
-                    override fun onProgress(scanned: Int, total: Long, valid: Int, currentIP: String?) {
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            val ipInfo = if (currentIP != null) " ($currentIP)" else ""
-                            (activity as MainActivity).updateStatus("$scanned / $total scanned – $valid valid IPs$ipInfo")
-                        }
+                onProgress = { scanned, total, valid, currentIP ->
+                    launch(Dispatchers.Main) {
+                        val ipInfo = if (currentIP != null) " ($currentIP)" else ""
+                        (activity as MainActivity).updateStatus("$scanned / $total scanned – $valid valid IPs$ipInfo")
                     }
                 },
-                object : PyIpScanner.ResultCallback {
-                    override fun onResult(item: Map<String, Any>) {
-                        lifecycleScope.launch(Dispatchers.Main) {
-                            val map = item.mapValues { it.value.toString() }
-                            results.add(map)
-                            adapter.notifyItemInserted(results.size - 1)
-                            if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
-                        }
+                onResult = { item ->
+                    launch(Dispatchers.Main) {
+                        results.add(item)
+                        adapter.notifyItemInserted(results.size - 1)
+                        if (results.isNotEmpty()) binding.btnCopy.visibility = View.VISIBLE
                     }
                 }
             )
