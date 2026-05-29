@@ -15,7 +15,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var drawerToggle: ActionBarDrawerToggle
 
-    // Current scan config (can be updated from SettingsFragment)
     var scanConfig = ScanConfig()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,19 +22,16 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Set up toolbar as action bar
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        // Drawer toggle
         drawerToggle = ActionBarDrawerToggle(
             this, binding.drawerLayout, binding.toolbar,
-            R.string.app_name, R.string.app_name
+            R.string.drawer_open, R.string.drawer_close
         )
         binding.drawerLayout.addDrawerListener(drawerToggle)
         drawerToggle.syncState()
 
-        // Navigation item selection
         binding.navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_ipv4 -> loadFragment(ScanFragment.newInstance(ScanType.IPV4), "IPv4 Scan")
@@ -50,7 +46,6 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        // Start with IPv4 scan
         if (savedInstanceState == null) {
             loadFragment(ScanFragment.newInstance(ScanType.IPV4), "IPv4 Scan")
         }
