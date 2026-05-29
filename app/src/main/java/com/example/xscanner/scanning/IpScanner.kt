@@ -21,7 +21,6 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
         .writeTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    // Load CIDR ranges from raw resource, parse into (base IP bytes, prefix length)
     private fun loadCidrRanges(): List<Pair<ByteArray, Int>> {
         val resId = if (scanType == ScanType.IPV4) R.raw.ipv4 else R.raw.ipv6
         return context.resources.openRawResource(resId).bufferedReader().readLines()
@@ -40,7 +39,6 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
             }
     }
 
-    // Calculate total possible hosts from the CIDR ranges (used only for progress display)
     private fun totalHosts(ranges: List<Pair<ByteArray, Int>>): Long {
         var total = 0L
         for ((_, prefix) in ranges) {
@@ -49,13 +47,13 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
                 val hosts = (1L shl (32 - prefix)) - 2L
                 total += hosts
             } else {
-                return Long.MAX_VALUE  // IPv6 huge, avoid overflow
+                return Long.MAX_VALUE
             }
         }
         return total.coerceAtMost(Long.MAX_VALUE)
     }
 
-    // Returns a suspend lambda that generates a random IP string from the given ranges,
+    // Returns a suspend function that generates a random IP string from the ranges,
     // or null if no IP can be generated.
     private fun randomIpGenerator(ranges: List<Pair<ByteArray, Int>>): suspend () -> String? {
         if (ranges.isEmpty()) return { null }
@@ -70,14 +68,16 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
                 val networkMask = (-1) shl (32 - prefix)
                 val network = baseInt and networkMask
                 val hosts = if (prefix >= 32) 0L else (1L shl (32 - prefix)) - 2L
-                if (hosts <= 0) return@return null
-                val offset = rng.nextLong(1, hosts + 1)
-                val ipInt = network + offset.toInt()
-                val oct1 = (ipInt ushr 24) and 0xFF
-                val oct2 = (ipInt ushr 16) and 0xFF
-                val oct3 = (ipInt ushr 8) and 0xFF
-                val oct4 = ipInt and 0xFF
-                "$oct1.$oct2.$oct3.$oct4"
+                if (hosts <= 0) null
+                else {
+                    val offset = rng.nextLong(1, hosts + 1)
+                    val ipInt = network + offset.toInt()
+                    val oct1 = (ipInt ushr 24) and 0xFF
+                    val oct2 = (ipInt ushr 16) and 0xFF
+                    val oct3 = (ipInt ushr 8) and 0xFF
+                    val oct4 = ipInt and 0xFF
+                    "$oct1.$oct2.$oct3.$oct4"
+                }
             } else null  // IPv6 not yet supported
         }
     }
@@ -94,7 +94,6 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
         val testedIps = mutableSetOf<String>()
         val gen = randomIpGenerator(ranges)
 
-        // Show initial total
         withContext(Dispatchers.Main) { onProgress(0, total, 0) }
 
         while (validFound < config.maxIp) {
@@ -134,8 +133,6 @@ class IpScanner(private val scanType: ScanType, private val context: Context) {
             val item = ResultItem(ip, pingMs, 0.0, jitter, latency, upload, download)
             withContext(Dispatchers.Main) { onResult(item) }
             validFound++
-
-            // Update progress after each valid IP
             withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
         }
         withContext(Dispatchers.Main) { onProgress(scanned, total, validFound) }
